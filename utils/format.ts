@@ -1,0 +1,1 @@
+export const short = (s?: string) => s?.slice(0, 8) ?? '';
