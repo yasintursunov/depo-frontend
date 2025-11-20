@@ -1,60 +1,83 @@
-
 'use client';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getInventoryApi, listItemsApi, createItemApi, listFieldsApi, upsertFieldApi, deleteFieldApi, listCustomElementsApi, upsertCustomElementsApi, listTagsApi } from '../../../lib/api';
+import {
+  getInventoryApi,
+  listItemsApi,
+  createItemApi,
+  listFieldsApi,
+  upsertFieldApi,
+  deleteFieldApi,
+  listCustomElementsApi,
+  upsertCustomElementsApi,
+  listTagsApi,
+  likeApi
+} from '../../../lib/api';
 import FieldEditor from '../../../components/FieldEditor';
 import ItemEditor from '../../../components/ItemEditor';
 import TagsManager from '../../../components/TagsManager';
 import AccessManager from '../../../components/AccessManager';
 import PostsList from '../../../components/PostsList';
-import { likeApi } from '../../../lib/api';
+import type { Inventory, Field, Item } from '../../../lib/types';
 
 export default function InventoryDetails({ params }: { params: { id: string } }) {
   const id = params.id;
-  const [inv, setInv] = useState<any>(null);
-  const [items, setItems] = useState<any[]>([]);
-  const [fields, setFields] = useState<any[]>([]);
-  const [editingField, setEditingField] = useState<any|undefined>(undefined);
+  const [inv, setInv] = useState<Inventory | null>(null);
+  const [items, setItems] = useState<Item[]>([]);
+  const [fields, setFields] = useState<Field[]>([]);
+  const [editingField, setEditingField] = useState<Field | undefined>(undefined);
   const router = useRouter();
 
-  useEffect(()=>{ load(); }, [id]);
-
-  async function load() {
+  const load = useCallback(async () => {
     try {
       const i = await getInventoryApi(id);
-      setInv(i);
+      setInv((i as any) ?? null);
       const it = await listItemsApi(id);
-      setItems(Array.isArray(it) ? it : (it?.items ?? []));
+      setItems(Array.isArray(it) ? (it as Item[]) : ((it as any)?.items ?? []) as Item[]);
       const f = await listFieldsApi(id);
-      setFields(f || []);
-    } catch(e){ console.error(e); }
-  }
+      setFields(f as Field[] ?? []);
+    } catch (e) {
+      console.error(e);
+    }
+  }, [id]);
 
-  async function addField(field:any) {
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function addField(field: Partial<Field>) {
     try {
       const saved = await upsertFieldApi(id, field);
-      setFields(prev => [saved, ...prev.filter(p=>p.id !== saved.id)]);
+      setFields(prev => [saved as Field, ...prev.filter(p => (p.id) !== (saved as any).id)]);
       setEditingField(undefined);
-    } catch(e:any){ alert(e?.body?.error || e?.message); }
+    } catch (e: unknown) {
+      const err = e as any;
+      alert(err?.body?.error || err?.message);
+    }
   }
 
-  async function removeField(fieldId:string) {
+  async function removeField(fieldId: string) {
     try {
       await deleteFieldApi(id, fieldId);
-      setFields(prev => prev.filter(f=>f.id !== fieldId));
-    } catch(e:any){ alert(e?.body?.error || e?.message); }
+      setFields(prev => prev.filter(f => f.id !== fieldId));
+    } catch (e: unknown) {
+      const err = e as any;
+      alert(err?.body?.error || err?.message);
+    }
   }
 
   async function createItem() {
     try {
       const res = await createItemApi(id, { values: {} });
-      setItems(prev => [res, ...prev]);
-    } catch(e:any){ alert(e?.body?.error || e?.message); }
+      setItems(prev => [(res as Item), ...prev]);
+    } catch (e: unknown) {
+      const err = e as any;
+      alert(err?.body?.error || err?.message);
+    }
   }
 
-  async function like(it:any) {
-    try { await likeApi(it.id); } catch(e:any){ /* ignore */ }
+  async function like(it: Item) {
+    try { await likeApi(it.id); } catch { /* ignore */ }
   }
 
   return (
@@ -74,10 +97,18 @@ export default function InventoryDetails({ params }: { params: { id: string } })
           <div className="p-3 bg-white rounded">
             <div className="flex justify-between items-center">
               <h3 className="font-semibold">Fields</h3>
-              <button onClick={() => setEditingField({})} className="px-2 py-1 rounded border">New field</button>
+              <button onClick={() => setEditingField({} as Field)} className="px-2 py-1 rounded border">New field</button>
             </div>
             <div className="mt-3 space-y-2">
-              {fields.map(f=> <div key={f.id} className="p-2 bg-gray-50 rounded flex justify-between items-center"><div>{f.title} • {f.kind}</div><div className="flex gap-2"><button onClick={()=>setEditingField(f)} className="text-sm border px-2 py-1 rounded">Edit</button><button onClick={()=>removeField(f.id)} className="text-sm border px-2 py-1 rounded">Delete</button></div></div>)}
+              {fields.map(f => (
+                <div key={f.id} className="p-2 bg-gray-50 rounded flex justify-between items-center">
+                  <div>{f.title} • {f.kind}</div>
+                  <div className="flex gap-2">
+                    <button onClick={() => setEditingField(f)} className="text-sm border px-2 py-1 rounded">Edit</button>
+                    <button onClick={() => removeField(f.id)} className="text-sm border px-2 py-1 rounded">Delete</button>
+                  </div>
+                </div>
+              ))}
             </div>
             {editingField && <div className="mt-3"><FieldEditor field={editingField} onSave={addField} onDelete={removeField} /></div>}
           </div>
@@ -97,7 +128,7 @@ export default function InventoryDetails({ params }: { params: { id: string } })
                     <div className="text-xs text-gray-500">v{it.version}</div>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={()=>like(it)} className="text-blue-600 text-sm">Like</button>
+                    <button onClick={() => like(it)} className="text-blue-600 text-sm">Like</button>
                   </div>
                 </div>
               ))}

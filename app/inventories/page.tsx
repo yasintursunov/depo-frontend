@@ -1,21 +1,10 @@
 'use client';
-
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { createInventoryApi, listInventoriesApi } from '../../lib/api';
 import Link from 'next/link';
 import ErrorBanner from '../../components/ErrorBanner';
-
-type Inventory = {
-  id: string;
-  owner_id?: string;
-  title: string;
-  description?: string;
-  category?: string;
-  image_url?: string;
-  is_public?: boolean;
-  version?: number;
-  created_at?: string;
-};
+import type { Inventory } from '../../lib/types';
+import InventoryCard from '../../components/InventoryCard';
 
 export default function InventoriesPage() {
   const [items, setItems] = useState<Inventory[]>([]);
@@ -25,36 +14,35 @@ export default function InventoriesPage() {
   const [isPublic, setIsPublic] = useState(false);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown | null>(null);
   const [page, setPage] = useState(0);
   const limit = 50;
 
-  useEffect(() => {
-    load(page);
-  }, [page]);
-
-  async function load(pageIndex = 0) {
+  const load = useCallback(async (pageIndex = 0) => {
     setLoading(true);
     setError(null);
     try {
       const offset = pageIndex * limit;
-      const res: any = await listInventoriesApi(limit, offset);
-      const arr = Array.isArray(res) ? res : (res?.inventories ?? (res ? [res] : []));
-      setItems(arr);
-    } catch (e: any) {
+      const res = await listInventoriesApi(limit, offset);
+      const arr = Array.isArray(res) ? res : ((res as any)?.inventories ?? (res ? [res] : []));
+      setItems(arr as Inventory[]);
+    } catch (e) {
       console.error('listInventories error', e);
-      if (e?.body?.error) setError(String(e.body.error));
-      else if (e?.message) setError(e.message);
-      else setError('Failed to load inventories');
+      setError(e);
+      setItems([]);
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    load(page);
+  }, [load, page]);
 
   async function createInventory() {
     setError(null);
     if (!title.trim()) {
-      setError('Title is required');
+      setError(new Error('Title is required'));
       return;
     }
 
@@ -67,30 +55,27 @@ export default function InventoriesPage() {
     };
 
     setCreating(true);
-
     const tempId = `temp-${Date.now()}`;
-    const tempInv: Inventory = { id: tempId, title: payload.title, description: payload.description || '', category: payload.category, is_public: payload.is_public, version: 1 };
+    const tempInv: Inventory = { id: tempId, title: payload.title, description: payload.description ?? '', category: payload.category, is_public: payload.is_public, version: 1 };
     setItems(prev => [tempInv, ...prev]);
 
     try {
-      const created: any = await createInventoryApi(payload);
-      const inv = created?.id ? created : (created?.inventory ?? created);
-      setItems(prev => [inv, ...prev.filter(i => i.id !== tempId)]);
+      const created = await createInventoryApi(payload);
+      const inv = (created as any)?.id ? (created as Inventory) : ((created as any)?.inventory ?? created as Inventory);
+      setItems(prev => [inv as Inventory, ...prev.filter(i => i.id !== tempId)]);
       setTitle('');
       setDescription('');
       setCategory('Other');
       setIsPublic(false);
-    } catch (e: any) {
+    } catch (e) {
       console.error('createInventory error', e);
       setItems(prev => prev.filter(i => i.id !== tempId));
-      if (e?.body?.error) setError(String(e.body.error));
-      else if (e?.status === 409) setError('Conflict (custom_id or duplicate)');
-      else setError(e?.message || 'Create failed');
+      setError(e as unknown);
     } finally {
       setCreating(false);
     }
   }
-  {error && <div className="mt-3"><ErrorBanner error={{ status: (error as any).status, message: (error as any).message, body: (error as any).body || (error as any).details }} /></div>}
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -140,7 +125,7 @@ export default function InventoriesPage() {
           </div>
         </div>
 
-        {error && <div className="mt-3 text-sm text-red-600">{error}</div>}
+        
       </div>
 
       <div>
@@ -148,18 +133,7 @@ export default function InventoriesPage() {
           <div>Loading inventories…</div>
         ) : (
           <div className="grid gap-3">
-            {items.map(i => (
-              <div key={i.id} className="card flex items-center justify-between">
-                <div>
-                  <div className="font-semibold">{i.title}</div>
-                  <div className="text-sm text-gray-500">{i.description}</div>
-                  <div className="text-xs text-gray-400 mt-1">v{i.version ?? 1}</div>
-                </div>
-                <div className="flex gap-2 items-center">
-                  <Link href={`/inventories/${i.id}`} className="text-indigo-600 text-sm">Open</Link>
-                </div>
-              </div>
-            ))}
+            {items.map(i => <InventoryCard key={i.id} inv={i} />)}
           </div>
         )}
       </div>

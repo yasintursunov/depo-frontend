@@ -1,10 +1,10 @@
-
 'use client';
 import Link from 'next/link';
 import React from 'react';
+import type { Inventory } from '../lib/types';
 
-export default function InventoryCard({ inv }: { inv: any }) {
-  const title = inv.title ?? inv.name ?? 'Untitled';
+export default function InventoryCard({ inv }: { inv: Inventory }) {
+  const title = inv.title ?? 'Untitled';
   const desc = inv.description ?? '';
   return (
     <div className="card flex items-center justify-between">

@@ -1,30 +1,30 @@
-
 'use client';
-
 import Link from 'next/link';
 import React, { useEffect, useState } from 'react';
 import { getMeApi, logoutApi } from '../lib/api';
 import { getDevUser } from './DevAuth';
+import type { User } from '../lib/types';
 
 export default function Navbar() {
-  const [me, setMe] = useState<any>(null);
+  const [me, setMe] = useState<User | null>(null);
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
 
   useEffect(() => {
-  (async () => {
-    try {
-      const r = await getMeApi();
-      setMe(r?.user ? r.user : r);
-    } catch {
-      if (process.env.NEXT_PUBLIC_ENABLE_DEV_AUTH === 'true') {
-        const dev = getDevUser();
-        if (dev) setMe(dev);
-        else setMe(null);
-      } else {
-        setMe(null);
+    (async () => {
+      try {
+        const r = await getMeApi();
+        const user = (r as any)?.user ?? r;
+        setMe(user as User);
+      } catch {
+        if (process.env.NEXT_PUBLIC_ENABLE_DEV_AUTH === 'true') {
+          const dev = getDevUser();
+          if (dev) setMe(dev);
+          else setMe(null);
+        } else {
+          setMe(null);
+        }
       }
-    }
-  })();
+    })();
   }, []);
 
   async function doLogout() {
@@ -49,7 +49,7 @@ export default function Navbar() {
       return;
     }
 
-    try { popup.focus(); } catch (e) { /* ignore */ }
+    try { popup.focus(); } catch { /* ignore */ }
   };
 
   return (

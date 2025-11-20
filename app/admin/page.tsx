@@ -1,29 +1,42 @@
 'use client';
 import React, { useEffect, useState } from 'react';
 import { adminListUsersApi, adminSetUserRoleApi } from '../../lib/api';
+import type { User } from '../../lib/types';
 
 export default function AdminPage() {
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    adminListUsersApi().then(r => {
-      setUsers(Array.isArray(r) ? r : (r?.users ?? r ?? []));
-    }).catch(e => {
-      console.error(e);
-      setUsers([]);
-    });
+    let mounted = true;
+    (async () => {
+      try {
+        const r = await adminListUsersApi();
+        const arr = Array.isArray(r) ? r : ((r as any)?.users ?? r ?? []);
+        if (mounted) setUsers(arr as User[]);
+      } catch (e) {
+        console.error(e);
+        if (mounted) setUsers([]);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
   }, []);
 
-  async function toggle(u: any) {
+  async function toggle(u: User) {
     try {
       const newRole = u.role === 'admin' ? 'user' : 'admin';
       await adminSetUserRoleApi(u.id, { role: newRole });
       const fresh = await adminListUsersApi();
-      setUsers(Array.isArray(fresh) ? fresh : (fresh?.users ?? fresh ?? []));
-    } catch (e: any) {
-      alert(e?.body?.error || e?.message || 'Error');
+      setUsers(Array.isArray(fresh) ? (fresh as User[]) : ((fresh as any)?.users ?? fresh ?? []) as User[]);
+    } catch (e: unknown) {
+      const err = e as any;
+      alert(err?.body?.error || err?.message || 'Error');
     }
   }
+
+  if (loading) return <div>Loading…</div>;
 
   return (
     <div>

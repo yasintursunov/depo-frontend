@@ -9,7 +9,7 @@ export default function AuthCallback() {
     (async () => {
       try {
         await getMeApi();
-      } catch (e) {
+      } catch {
         // ignore
       } finally {
         router.replace('/');
